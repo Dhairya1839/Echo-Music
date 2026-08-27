@@ -464,7 +464,7 @@ object YouTube {
             }
             musicCarouselShelfRenderer != null -> {
                 ArtistItemsPage(
-                    title = musicCarouselShelfRenderer.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.firstOrNull()?.text.orEmpty(),
+                    title = musicCarouselShelfBasicHeaderRenderer?.title?.runs?.firstOrNull()?.text.orEmpty(),
                     items = musicCarouselShelfRenderer.contents.mapNotNull { content ->
                         content.musicTwoRowItemRenderer?.let { renderer ->
                             ArtistItemsPage.fromMusicTwoRowItemRenderer(renderer)
@@ -1127,30 +1127,14 @@ object YouTube {
         innerTube.deletePlaylist(WEB_REMIX, playlistId)
     }
 
-    suspend fun player(videoId: String, playlistId: String? = null, client: YouTubeClient, signatureTimestamp: Int? = null, poToken: String? = null): Result<PlayerResponse> = runCatching {
-        try {
-            innerTube.player(client, videoId, playlistId, signatureTimestamp, poToken).body<PlayerResponse>()
-        } catch (e: Exception) {
-            // Fallback for player response if direct InnerTube player API fails
-            val fallbackUrl = innerTube.fetchFallbackAudioStream(videoId)
-            if (fallbackUrl != null) {
-                PlayerResponse(
-                    playabilityStatus = PlayerResponse.PlayabilityStatus(status = "OK"),
-                    streamingData = PlayerResponse.StreamingData(
-                        adaptiveFormats = listOf(
-                            PlayerResponse.StreamingData.AdaptiveFormat(
-                                itag = 140,
-                                mimeType = "audio/mp4",
-                                bitrate = 128000,
-                                url = fallbackUrl
-                            )
-                        )
-                    )
-                )
-            } else {
-                throw e
-            }
-        }
+    suspend fun player(
+        videoId: String,
+        playlistId: String? = null,
+        client: YouTubeClient,
+        signatureTimestamp: Int? = null,
+        poToken: String? = null
+    ): Result<PlayerResponse> = runCatching {
+        innerTube.player(client, videoId, playlistId, signatureTimestamp, poToken).body<PlayerResponse>()
     }
 
     suspend fun registerPlayback(playlistId: String? = null, playbackTracking: String) = runCatching {
@@ -1417,20 +1401,17 @@ object YouTube {
             return decodedSigResponse
         }
 
-        // Automatic fallback: If NewPipe local cipher extractor fails, fetch direct audio stream from live Piped instance
         val fallbackStreamUrl = innerTube.fetchFallbackAudioStream(videoId)
-        if (!fallbackStreamUrl.isNullOrEmpty()) {
+        if (!fallbackStreamUrl.isNullOrEmpty() && tempRes.streamingData != null) {
             return tempRes.copy(
-                playabilityStatus = PlayerResponse.PlayabilityStatus(status = "OK"),
-                streamingData = PlayerResponse.StreamingData(
-                    adaptiveFormats = listOf(
-                        PlayerResponse.StreamingData.AdaptiveFormat(
-                            itag = 140,
-                            mimeType = "audio/mp4",
-                            bitrate = 128000,
-                            url = fallbackStreamUrl
-                        )
-                    )
+                streamingData = tempRes.streamingData.copy(
+                    adaptiveFormats = tempRes.streamingData.adaptiveFormats.map { adaptiveFormat ->
+                        if (adaptiveFormat.mimeType?.startsWith("audio") == true) {
+                            adaptiveFormat.copy(url = fallbackStreamUrl)
+                        } else {
+                            adaptiveFormat
+                        }
+                    }
                 )
             )
         }
