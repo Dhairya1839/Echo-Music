@@ -23,10 +23,15 @@ import io.ktor.client.plugins.compression.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.HttpTimeout
 import io.ktor.client.request.*
+import io.ktor.client.statement.HttpResponse
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import java.net.Proxy
 import java.io.IOException
 import kotlinx.coroutines.delay
@@ -71,6 +76,12 @@ class InnerTube {
         }
 
     var useLoginForBrowse: Boolean = false
+
+    private val pipedInstances = listOf(
+        "https://pipedapi.kavin.rocks",
+        "https://api.piped.privacydev.net",
+        "https://piped-api.garudalinux.org"
+    )
 
     @OptIn(ExperimentalSerializationApi::class)
     private fun createClient() = HttpClient(OkHttp) {
@@ -185,6 +196,32 @@ class InnerTube {
         }
         userAgent(client.userAgent)
         parameter("prettyPrint", false)
+    }
+
+    /**
+     * Fallback stream resolver: Automatically queries live backend instances
+     * to obtain an active, decrypted audio stream URL if YouTube cipher restricts playback.
+     */
+    suspend fun fetchFallbackAudioStream(videoId: String): String? {
+        for (instance in pipedInstances) {
+            try {
+                val response: HttpResponse = httpClient.get("$instance/streams/$videoId") {
+                    header("User-Agent", "Mozilla/5.0")
+                }
+                val bodyText = response.bodyAsText()
+                val json = Json.parseToJsonElement(bodyText).jsonObject
+                val audioStreams = json["audioStreams"]?.jsonArray
+                if (!audioStreams.isNullOrEmpty()) {
+                    val streamUrl = audioStreams[0].jsonObject["url"]?.jsonPrimitive?.content
+                    if (!streamUrl.isNullOrEmpty()) {
+                        return streamUrl
+                    }
+                }
+            } catch (_: Exception) {
+                continue
+            }
+        }
+        return null
     }
 
     /**
@@ -721,7 +758,6 @@ class InnerTube {
         }
     }
 
-
     suspend fun getMediaInfo(videoId: String): Result<MediaInfo> =
         runCatching {
             val response = next(client = YouTubeClient.WEB, videoId, null, null, null, null, null).body<NextResponse>()
@@ -790,8 +826,5 @@ class InnerTube {
                 like = returnYouTubeDislikeResponse.likes,
                 dislike = returnYouTubeDislikeResponse.dislikes,
             )
-
         }
-
-
 }
