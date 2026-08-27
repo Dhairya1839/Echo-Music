@@ -464,7 +464,7 @@ object YouTube {
             }
             musicCarouselShelfRenderer != null -> {
                 ArtistItemsPage(
-                    title = musicCarouselShelfBasicHeaderRenderer?.title?.runs?.firstOrNull()?.text.orEmpty(),
+                    title = musicCarouselShelfRenderer.header?.musicCarouselShelfBasicHeaderRenderer?.title?.runs?.firstOrNull()?.text.orEmpty(),
                     items = musicCarouselShelfRenderer.contents.mapNotNull { content ->
                         content.musicTwoRowItemRenderer?.let { renderer ->
                             ArtistItemsPage.fromMusicTwoRowItemRenderer(renderer)
