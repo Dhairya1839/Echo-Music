@@ -28,7 +28,6 @@ android {
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
-
     defaultConfig {
         applicationId = "iad1tya.echo.music"
         minSdk = 26
@@ -39,6 +38,12 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
 
+        // Force compilation only for 64-bit ARM architecture
+        ndk {
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
+        }
+
         // LastFM API keys from GitHub Secrets
         val lastFmKey = localProperties.getProperty("LASTFM_API_KEY") ?: System.getenv("LASTFM_API_KEY") ?: ""
         val lastFmSecret = localProperties.getProperty("LASTFM_SECRET") ?: System.getenv("LASTFM_SECRET") ?: ""
@@ -46,8 +51,7 @@ android {
         buildConfigField("String", "LASTFM_API_KEY", "\"$lastFmKey\"")
         buildConfigField("String", "LASTFM_SECRET", "\"$lastFmSecret\"")
 
-        // Google Fonts Web Fonts Developer API key (optional).
-        // Without it the app falls back to the public, key-free Google Fonts metadata endpoint.
+        // Google Fonts Web Fonts Developer API key
         val googleFontsKey = localProperties.getProperty("GOOGLE_FONTS_API_KEY") ?: System.getenv("GOOGLE_FONTS_API_KEY") ?: ""
         buildConfigField("String", "GOOGLE_FONTS_API_KEY", "\"$googleFontsKey\"")
 
@@ -60,7 +64,7 @@ android {
         buildConfigField("String", "FLOW_NEURO_BASE_URL", project.findProperty("FLOW_NEURO_BASE_URL")?.toString()?.let { "\"$it\"" } ?: "\"https://api.flowneuroengine.com\"")
         buildConfigField("String", "FLOW_NEURO_API_KEY", project.findProperty("FLOW_NEURO_API_KEY")?.toString()?.let { "\"$it\"" } ?: "\"\"")
 
-//add nightly build label support
+        // Nightly build label support
         val isNightly = project.hasProperty("nightly") && project.property("nightly") == "true"
         buildConfigField("Boolean", "IS_NIGHTLY", isNightly.toString())
 
@@ -73,7 +77,6 @@ android {
         buildConfigField("String", "DISCORD_REDIRECT_SCHEME", "\"$discordRedirectScheme\"")
         manifestPlaceholders["discordRedirectScheme"] = discordRedirectScheme
     }
-
 
     flavorDimensions += listOf("abi", "variant")
     productFlavors {
@@ -90,29 +93,19 @@ android {
             buildConfigField("Boolean", "CAST_AVAILABLE", "true")
         }
 
-        create("universal") {
-            dimension = "abi"
-            buildConfigField("String", "ARCHITECTURE", "\"universal\"")
-        }
+        // Keep only arm64 ABI flavor
         create("arm64") {
             dimension = "abi"
+            isDefault = true
             buildConfigField("String", "ARCHITECTURE", "\"arm64\"")
             ndk { abiFilters.add("arm64-v8a") }
         }
-        create("armeabi") {
-            dimension = "abi"
-            buildConfigField("String", "ARCHITECTURE", "\"armeabi\"")
-            ndk { abiFilters.add("armeabi-v7a") }
-        }
-        create("x86") {
-            dimension = "abi"
-            buildConfigField("String", "ARCHITECTURE", "\"x86\"")
-            ndk { abiFilters.add("x86") }
-        }
-        create("x86_64") {
-            dimension = "abi"
-            buildConfigField("String", "ARCHITECTURE", "\"x86_64\"")
-            ndk { abiFilters.add("x86_64") }
+    }
+
+    // Ignore unneeded build combinations
+    variantFilter {
+        if (flavors.any { it.name in listOf("universal", "armeabi", "x86", "x86_64") }) {
+            ignore = true
         }
     }
 
@@ -257,7 +250,6 @@ dependencies {
         exclude(group = "org.apache.httpcomponents")
     }
 
-
     implementation(libs.haze)
     implementation(libs.guava)
     implementation(libs.coroutines.guava)
@@ -332,7 +324,6 @@ dependencies {
     implementation(project(":paxsenixlyrics"))
     implementation(project(":unison"))
 
-
     implementation(libs.ktor.client.core)
     implementation(libs.retrofit)
     implementation(libs.retrofit.gson)
@@ -352,5 +343,4 @@ dependencies {
     implementation(libs.work.runtime.ktx)
     implementation(libs.androidx.core.splashscreen)
     implementation(libs.ffmpeg.kit.audio)
-
 }
