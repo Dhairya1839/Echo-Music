@@ -21,21 +21,24 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Generate Debug Keystore
+      - name: Create Release Keystore from Debug Key
         run: |
-          mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          mkdir -p app/keystore
+          keytool -genkey -v -keystore app/keystore/release.keystore \
+            -alias release -storepass android -keypass android \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Echo Music,O=Echo,C=US"
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build ARM64 APK
-        run: ./gradlew :app:assembleArm64FossDebug --no-daemon -x test
+      - name: Build Optimized ARM64 Release APK
+        run: ./gradlew :app:assembleArm64FossRelease --no-daemon -x test
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: EchoMusic-arm64
-          path: app/build/outputs/apk/**/debug/*.apk
+          name: EchoMusic-arm64-Release
+          path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
           
