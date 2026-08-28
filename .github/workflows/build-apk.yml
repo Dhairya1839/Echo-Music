@@ -21,7 +21,7 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Create Release Keystore from Debug Key
+      - name: Generate Release Keystore
         run: |
           mkdir -p app/keystore
           keytool -genkey -v -keystore app/keystore/release.keystore \
@@ -33,7 +33,17 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Optimized ARM64 Release APK
-        run: ./gradlew :app:assembleArm64FossRelease --no-daemon -x test
+        env:
+          KEYSTORE_PASSWORD: android
+          KEY_ALIAS: release
+          KEY_PASSWORD: android
+        run: |
+          ./gradlew :app:assembleArm64FossRelease \
+            -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/app/keystore/release.keystore \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=release \
+            -Pandroid.injected.signing.key.password=android \
+            --no-daemon -x test
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
@@ -41,4 +51,3 @@ jobs:
           name: EchoMusic-arm64-Release
           path: app/build/outputs/apk/**/release/*.apk
           if-no-files-found: error
-          
